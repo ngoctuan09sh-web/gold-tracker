@@ -48,6 +48,18 @@ button.del{min-height:36px;padding:4px 10px;color:var(--mut)}button.del:hover{co
 .menu .dd{position:absolute;right:0;top:46px;background:var(--surf);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow);padding:6px;display:flex;flex-direction:column;min-width:190px;z-index:30}
 .menu .dd button{border:0;text-align:left;background:transparent}
 .menu .dd button:hover{background:var(--surf2)}
+#cloud{padding:4px 10px;font-size:18px;line-height:1}
+#cloud.ok{color:var(--ok)}#cloud.err{color:var(--bad);border-color:var(--bad)}#cloud.load{color:var(--primary);animation:p 1s infinite}
+dialog{border:1px solid var(--line);border-radius:16px;background:var(--surf);color:var(--txt);max-width:480px;width:calc(100% - 28px);padding:20px;box-shadow:0 10px 40px rgba(0,0,0,.3)}
+dialog::backdrop{background:rgba(0,0,0,.45)}
+dialog h2{margin:0 0 8px;font-size:19px}
+dialog p,dialog li{font-size:14.5px;color:var(--mut)}
+dialog ol{padding-left:20px;margin:8px 0 14px}
+dialog a{color:var(--accent);font-weight:600}
+dialog input{width:100%;font:inherit;font-size:16px;padding:10px;border-radius:10px;border:1px solid var(--line);background:var(--surf2);color:var(--txt);margin:6px 0 12px}
+dialog .btns{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}
+dialog .stt{font-size:14px;padding:8px 10px;border-radius:10px;background:var(--surf2);margin-bottom:12px}
+dialog .stt.err{color:var(--bad)}dialog .stt.ok{color:var(--ok)}
 
 .tabs{display:flex;gap:6px;overflow-x:auto;margin:14px 0;padding-bottom:2px;scrollbar-width:none}
 .tabs::-webkit-scrollbar{display:none}
@@ -136,10 +148,12 @@ p.hint{text-align:center;margin:22px 0 40px}
 <header class="top"><div class="wrap">
   <div class="brand"><img src="icon-192.png" alt=""><b>Theo dõi vàng</b></div>
   <div class="pill" id="livePill"><i class="pulse" id="pulse"></i><span id="liveTxt">Đang tải giá…</span></div>
+  <button id="cloud" hidden title="Đồng bộ" aria-label="Đồng bộ">☁</button>
   <button id="btnLive" title="Cập nhật giá ngay" aria-label="Cập nhật giá">⟳</button>
   <button id="btnInstall" hidden class="primary">Cài app</button>
   <details class="menu" id="menu"><summary aria-label="Menu">⋯</summary>
     <div class="dd">
+      <button id="btnSync">☁ Đồng bộ giữa các máy</button>
       <button id="btnExport">⬇ Xuất file sao lưu</button>
       <button id="btnImport">⬆ Nhập file</button>
       <button id="btnReset">🗑 Xoá hết dữ liệu</button>
@@ -162,6 +176,23 @@ p.hint{text-align:center;margin:22px 0 40px}
   <div id="view"></div>
   <p class="hint">Dữ liệu tự lưu trên thiết bị này • 1 cây = 10 chỉ • Dùng menu ⋯ → “Xuất file” để sao lưu hoặc chuyển sang máy khác.</p>
 </div>
+
+<dialog id="syncDlg">
+  <h2>☁ Đồng bộ giữa các máy</h2>
+  <p>Dữ liệu vàng được lưu trong một Gist <b>ẩn</b> của tài khoản GitHub của bạn. Gist ẩn không hiện trên trang cá nhân, nhưng ai có đường link đầy đủ thì xem được (link rất dài, khó đoán). Mã truy cập chỉ lưu trên thiết bị này.</p>
+  <ol>
+    <li>Mở <a href="https://github.com/settings/tokens/new?scopes=gist&description=theo-doi-vang" target="_blank" rel="noopener">trang tạo mã</a>, đăng nhập GitHub, bấm <b>Generate token</b> (đã chọn sẵn quyền <b>gist</b>), chép mã.</li>
+    <li>Dán mã vào ô dưới, bấm <b>Lưu &amp; đồng bộ</b>.</li>
+    <li>Làm tương tự trên điện thoại còn lại (dùng cùng mã hoặc tạo mã mới của cùng tài khoản).</li>
+  </ol>
+  <div class="stt" id="syncStt"></div>
+  <input id="syncTok" type="password" autocomplete="off" placeholder="Dán mã truy cập GitHub (ghp_…)">
+  <div class="btns">
+    <button id="syncOff" class="del">Tắt đồng bộ</button>
+    <button id="syncClose">Đóng</button>
+    <button id="syncSave" class="primary">Lưu &amp; đồng bộ</button>
+  </div>
+</dialog>
 
 <script>
 /* ---------- Dữ liệu ---------- */
@@ -199,7 +230,12 @@ function seed(){   // dữ liệu trống — số liệu thật nhập tay ho�
 let S; try{S=JSON.parse(localStorage.getItem(KEY))}catch(e){}
 if(!S||!S.prices) S=seed();
 S.basis=S.basis||'buy'; S.manual=S.manual||{}; S.live=S.live||null;
-const save=()=>localStorage.setItem(KEY,JSON.stringify(S));
+const payload=()=>{const mp={};for(const t in S.manual)if(S.manual[t])mp[t]=S.prices[t];
+  return {v:1,chung:S.chung,people:S.people,basis:S.basis,mp,updatedAt:S.updatedAt||0};};
+const core=()=>{const p=payload();delete p.updatedAt;return JSON.stringify(p);};
+let lastHash=core();
+const save=()=>{const c=core();if(c!==lastHash){lastHash=c;S.updatedAt=Date.now();if(typeof syncSoon==='function')syncSoon();}
+  localStorage.setItem(KEY,JSON.stringify(S));};
 
 /* ---------- Tính toán ---------- */
 const num = v => { const x=parseFloat(String(v).replace(',','.')); return isFinite(x)?x:0; };
@@ -402,6 +438,84 @@ function renderPerson(v,name){
   v.append(renameBtns(name));
 }
 
+/* ---------- Đồng bộ qua GitHub Gist ---------- */
+const SK='gold-sync-v1',FILE='gold-tracker-data.json',GAPI='https://api.github.com';
+let SY; try{SY=JSON.parse(localStorage.getItem(SK))||{}}catch(e){SY={}}
+const saveSY=()=>localStorage.setItem(SK,JSON.stringify(SY));
+async function gh(path,opt={}){
+  const r=await fetch(GAPI+path,{...opt,cache:'no-store',headers:{Authorization:'Bearer '+SY.token,Accept:'application/vnd.github+json','Content-Type':'application/json'}});
+  if(r.status===401)throw new Error('Mã truy cập không đúng hoặc đã hết hạn');
+  if(r.status===404)throw new Error('404');
+  if(!r.ok)throw new Error('GitHub báo lỗi '+r.status);
+  return r.json();
+}
+async function findGist(){
+  for(let pg=1;pg<=5;pg++){const l=await gh('/gists?per_page=100&page='+pg);const g=l.find(x=>x.files&&x.files[FILE]);if(g)return g.id;if(l.length<100)break;}
+  return null;
+}
+async function readGist(id){
+  const g=await gh('/gists/'+id),f=g.files&&g.files[FILE];if(!f)throw new Error('404');
+  let txt=f.content;if(f.truncated)txt=await (await fetch(f.raw_url)).text();
+  return JSON.parse(txt);
+}
+const writeGist=id=>gh('/gists/'+id,{method:'PATCH',body:JSON.stringify({files:{[FILE]:{content:JSON.stringify(payload())}}})});
+function applyRemote(r){
+  S.chung=r.chung;S.people=r.people;S.basis=r.basis||'buy';S.manual={};
+  for(const t in (r.mp||{})){S.manual[t]=true;S.prices[t]=r.mp[t];}
+  S.updatedAt=r.updatedAt||0;applyLive();lastHash=core();localStorage.setItem(KEY,JSON.stringify(S));
+  if(tab!=='chung'&&!S.people[tab])tab='chung';
+  renderPrices();render();
+}
+const typing=()=>{const a=document.activeElement;return a&&['INPUT','SELECT','TEXTAREA'].includes(a.tagName);};
+let syncing=false,again=false,syncTimer;
+function syncSoon(){if(!SY.token)return;clearTimeout(syncTimer);syncTimer=setTimeout(syncNow,2500);}
+function setCloud(kind){
+  const b=$('#cloud');if(!b)return;
+  if(!SY.token){b.hidden=true;return;}
+  b.hidden=false;kind=kind||(SY.err?'err':'ok');b.className=kind;
+  b.title=SY.err?('Đồng bộ lỗi: '+SY.err):('Đã đồng bộ'+(SY.last?' lúc '+new Date(SY.last).toLocaleTimeString('vi-VN'):''));
+}
+async function syncNow(){
+  if(!SY.token)return;
+  if(syncing){again=true;return;}
+  syncing=true;setCloud('load');
+  try{
+    let id=SY.gistId||await findGist();
+    if(!id){
+      const g=await gh('/gists',{method:'POST',body:JSON.stringify({description:'Theo dõi vàng – dữ liệu đồng bộ',public:false,files:{[FILE]:{content:JSON.stringify(payload())}}})});
+      SY.gistId=g.id;
+    }else{
+      const first=!SY.gistId;SY.gistId=id;
+      const r=await readGist(id),mine=S.updatedAt||0,theirs=r.updatedAt||0;
+      if(first&&theirs!==mine&&mine&&!confirm('Đã có dữ liệu đồng bộ trên GitHub.\n\nOK = tải dữ liệu đó về máy này (thay dữ liệu đang có).\nHủy = giữ dữ liệu của máy này và ghi đè lên GitHub.')){await writeGist(id);}
+      else if(theirs>mine){ if(typing())again=true; else applyRemote(r); }
+      else if(theirs<mine){await writeGist(id);}
+    }
+    SY.last=Date.now();SY.err='';
+  }catch(e){
+    if(e.message==='404'){SY.gistId=null;SY.err='Không tìm thấy dữ liệu trên GitHub, sẽ tạo lại ở lần sau';}
+    else SY.err=e.message&&e.message.includes('Failed to fetch')?'Không có mạng':(e.message||'Lỗi mạng');
+  }
+  saveSY();syncing=false;setCloud();updSyncStt();
+  if(again){again=false;setTimeout(syncNow,4000);}
+}
+function updSyncStt(){
+  const e=$('#syncStt');if(!e)return;
+  e.className='stt'+(SY.token?(SY.err?' err':' ok'):'');
+  e.textContent=!SY.token?'Chưa bật đồng bộ.':SY.err?'Lỗi: '+SY.err:'Đã bật • đồng bộ lần cuối '+(SY.last?new Date(SY.last).toLocaleString('vi-VN'):'…');
+}
+$('#btnSync').onclick=()=>{$('#syncTok').value='';$('#syncTok').placeholder=SY.token?'Đã lưu mã (nhập mã mới để thay)':'Dán mã truy cập GitHub (ghp_…)';updSyncStt();$('#syncDlg').showModal();};
+$('#cloud').onclick=$('#btnSync').onclick;
+$('#syncClose').onclick=()=>$('#syncDlg').close();
+$('#syncSave').onclick=async()=>{
+  const t=$('#syncTok').value.trim();
+  if(t){if(!/^[\w-]{20,}$/.test(t)){alert('Mã không hợp lệ. Hãy chép lại toàn bộ mã.');return;}SY={token:t};saveSY();}
+  else if(!SY.token){alert('Hãy dán mã truy cập vào ô.');return;}
+  $('#syncStt').className='stt';$('#syncStt').textContent='Đang đồng bộ…';
+  await syncNow();
+};
+$('#syncOff').onclick=()=>{if(confirm('Tắt đồng bộ trên máy này? Dữ liệu trên máy và trên GitHub vẫn giữ nguyên.')){SY={};saveSY();setCloud();updSyncStt();}};
+
 /* ---------- Điều hướng ---------- */
 function render(){
   live=[updPsum];
@@ -417,16 +531,17 @@ function render(){
 document.addEventListener('click',e=>{const m=$('#menu');if(m&&m.open&&(!m.contains(e.target)||e.target.closest('.dd button')))m.open=false;});
 $('#btnExport').onclick=()=>{const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify(S,null,2)],{type:'application/json'}));a.download='vang-'+new Date().toISOString().slice(0,10)+'.json';a.click();};
 $('#btnImport').onclick=()=>$('#file').click();
-$('#file').onchange=e=>{const f=e.target.files[0];if(!f)return;f.text().then(t=>{try{const d=JSON.parse(t);if(!d.prices||!d.chung||!d.people)throw 0;S=d;S.basis=S.basis||'buy';S.manual=S.manual||{};save();renderPrices();render();refreshLive();}catch(_){alert('File không hợp lệ');}});e.target.value='';};
-$('#btnReset').onclick=()=>{if(confirm('Xoá toàn bộ dữ liệu trên thiết bị này? (Hãy bấm Xuất file trước nếu cần giữ lại)')){S=seed();S.basis='buy';S.manual={};save();renderPrices();render();refreshLive();}};
+$('#file').onchange=e=>{const f=e.target.files[0];if(!f)return;f.text().then(t=>{try{const d=JSON.parse(t);if(!d.prices||!d.chung||!d.people)throw 0;S=d;S.basis=S.basis||'buy';S.manual=S.manual||{};S.live=null;save();renderPrices();render();refreshLive();}catch(_){alert('File không hợp lệ');}});e.target.value='';};
+$('#btnReset').onclick=()=>{if(confirm('Xoá toàn bộ dữ liệu trên thiết bị này?'+(SY.token?'\n\nĐồng bộ đang bật: dữ liệu trên GitHub và các máy khác cũng sẽ bị xoá theo.':'')+'\n(Hãy bấm Xuất file trước nếu cần giữ lại)')){S=seed();S.basis='buy';S.manual={};save();renderPrices();render();refreshLive();}};
 if(innerWidth<700)$('#pricesD').open=false;
 renderPrices();render();
 applyLive();renderPrices();live.forEach(f=>f());
 if(S.live)setStatus('',statusText());
 refreshLive();
-setInterval(refreshLive,60000);                       // tự cập nhật mỗi phút khi đang mở app
-document.addEventListener('visibilitychange',()=>{if(!document.hidden)refreshLive();});
-window.addEventListener('online',refreshLive);
+setInterval(()=>{refreshLive();syncNow();},60000);                       // tự cập nhật mỗi phút khi đang mở app
+document.addEventListener('visibilitychange',()=>{if(!document.hidden){refreshLive();syncNow();}});
+window.addEventListener('online',()=>{refreshLive();syncNow();});
+setCloud();syncNow();
 
 /* ---------- Cài app (PWA) ---------- */
 let deferred;
