@@ -129,6 +129,28 @@ tfoot td{font-weight:700;background:var(--accent-bg);color:var(--txt);border-bot
 .foot{display:flex;justify-content:space-between;align-items:center;margin-top:12px;gap:10px;flex-wrap:wrap}
 .hint{color:var(--mut);font-size:13.5px}
 p.hint{text-align:center;margin:22px 0 40px}
+details.loc{border:1px solid var(--line);border-radius:14px;margin-bottom:10px;background:var(--surf2);overflow:hidden}
+details.loc>summary{list-style:none;cursor:pointer;padding:12px 14px;display:block}
+details.loc>summary::-webkit-details-marker{display:none}
+details.loc[open]>summary{border-bottom:1px solid var(--line);background:var(--surf)}
+.lh{display:flex;justify-content:space-between;align-items:baseline;gap:10px}
+.lname{font-size:17px}.lval{font-size:17px;color:var(--accent);font-variant-numeric:tabular-nums;white-space:nowrap}
+.lsub{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:6px;font-size:14px;color:var(--mut)}
+.lsub>span:first-child{font-weight:600;color:var(--txt)}
+.chip{font-size:12.5px;padding:2px 9px;border-radius:99px;border:1px solid var(--c);color:var(--txt);background:color-mix(in srgb,var(--c) 12%,var(--surf))}
+.lb{padding:12px 14px 14px;background:var(--surf)}
+.nrow{display:flex;gap:8px;margin-bottom:12px}
+.nrow input{flex:1;min-width:0;font:inherit;font-size:16px;font-weight:600;padding:9px 10px;border-radius:10px;border:1px solid var(--line);background:var(--surf2);color:var(--txt)}
+.lgrp{border-left:5px solid var(--c);background:var(--surf2);border-radius:10px;margin-top:10px;padding:8px 10px}
+.lgh{display:flex;justify-content:space-between;font-weight:700;font-size:14.5px;padding:2px 0 6px}
+.lgh b{font-variant-numeric:tabular-nums}
+.li{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:6px 0;border-top:1px solid var(--line)}
+.li .lt{font-size:15.5px}.li .lt small{display:block;color:var(--mut);font-size:12px}
+.li.has .lt{font-weight:700}
+.step{display:flex;align-items:center;gap:6px}
+.step button{width:44px;height:44px;padding:0;font-size:22px;line-height:1;border-radius:12px;display:grid;place-items:center}
+.step input{width:62px;height:44px;text-align:center;font:inherit;font-size:18px;font-weight:700;border-radius:12px;border:1px solid var(--line);background:var(--surf);color:var(--txt);padding:0}
+.li.has .step input{border-color:var(--accent)}
 
 @media(max-width:640px){
   .wrap{padding:0 12px}.card{padding:14px;border-radius:14px}
@@ -365,12 +387,59 @@ function summaryCard(rows,title,note){
   return h('div',{class:'card'},h('h2',{},title,h('small',{},note||'')),
     h('div',{class:'scroll'},h('table',{class:'sum'},h('thead',{},h('tr',{},h('th',{class:'l'},'Loại vàng'),h('th',{class:'r'},'Số chỉ'),h('th',{class:'r'},'Giá (tr/cây)'),h('th',{class:'r'},'Giá trị (triệu)'))),st)));
 }
+const isMob=()=>innerWidth<700;
+const openLoc=new Set();
+const GROUP_KEYS=[...new Set(COLS.map(c=>c.g))];
+const gChi=(r,g)=>COLS.reduce((s,c,i)=>c.g===g?s+num(r.c[i])*c.w:s,0);
+const locChi=r=>GROUP_KEYS.reduce((s,g)=>s+gChi(r,g),0);
+const locVal=r=>GROUP_KEYS.reduce((s,g)=>s+val(gChi(r,g),GROUPS[g].price),0);
+function invMobile(v){
+  const card=h('div',{class:'card'},h('h2',{},'Kiểm kê theo nơi cất',h('small',{},'chạm vào một nơi để xem / sửa')));
+  S.chung.rows.forEach((r,ri)=>{
+    const d=h('details',{class:'loc'});
+    if(openLoc.has(ri))d.open=true;
+    d.addEventListener('toggle',()=>{d.open?openLoc.add(ri):openLoc.delete(ri);});
+    const chips=h('div',{class:'chips'});
+    GROUP_KEYS.forEach(g=>{
+      const c=h('span',{class:'chip',style:'--c:'+GROUPS[g].color});
+      live.push(()=>{const x=gChi(r,g);c.textContent=g+' '+fmt(x)+' chỉ';c.hidden=!x;});
+      chips.append(c);
+    });
+    const none=h('span',{class:'hint'},'Chưa có vàng');
+    live.push(()=>{none.hidden=locChi(r)>0;});
+    d.append(h('summary',{},
+      h('div',{class:'lh'},bind(h('b',{class:'lname'}),()=>r.name||'(chưa đặt tên)'),bind(h('b',{class:'lval'}),()=>fmt(locVal(r))+' tr')),
+      h('div',{class:'lsub'},bind(h('span'),()=>fmt(locChi(r))+' chỉ'),chips,none)));
+    const body=h('div',{class:'lb'});
+    const nm=h('input',{class:'t',value:r.name,placeholder:'Tên nơi cất','aria-label':'Tên nơi cất'});
+    nm.addEventListener('input',()=>{r.name=nm.value;refresh();});
+    body.append(h('div',{class:'nrow'},nm,h('button',{class:'del',title:'Xoá nơi cất',onclick:()=>{if(confirm('Xoá "'+(r.name||'nơi cất này')+'"?')){S.chung.rows.splice(ri,1);openLoc.clear();save();render();}}},'🗑 Xoá')));
+    GROUP_KEYS.forEach(g=>{
+      const grp=h('div',{class:'lgrp',style:'--c:'+GROUPS[g].color},
+        h('div',{class:'lgh'},h('span',{},GLABEL[g]),bind(h('b'),()=>fmt(gChi(r,g))+' chỉ')));
+      COLS.forEach((c,i)=>{ if(c.g!==g)return;
+        const inp=h('input',{type:'number',inputmode:'decimal',min:0,step:'any',placeholder:'0',value:r.c[i]||'','aria-label':c.n});
+        const row=h('div',{class:'li'},h('div',{class:'lt'},c.n,h('small',{},c.w+' chỉ')));
+        const set=x=>{x=Math.max(0,Math.round(x*100)/100);r.c[i]=x;inp.value=x||'';refresh();};
+        inp.addEventListener('input',()=>{r.c[i]=num(inp.value);refresh();});
+        live.push(()=>row.classList.toggle('has',num(r.c[i])>0));
+        row.append(h('div',{class:'step'},h('button',{'aria-label':'Giảm',onclick:()=>set(num(r.c[i])-1)},'−'),inp,h('button',{'aria-label':'Tăng',onclick:()=>set(num(r.c[i])+1)},'+')));
+        grp.append(row);
+      });
+      body.append(grp);
+    });
+    d.append(body);card.append(d);
+  });
+  card.append(h('div',{class:'foot'},h('span'),h('button',{class:'primary',onclick:()=>{S.chung.rows.push({name:'Nơi cất mới',c:COLS.map(()=>0)});openLoc.add(S.chung.rows.length-1);save();render();}},'＋ Thêm nơi cất')));
+  v.append(card);
+}
 function renderChung(v){
   $('#heroBox').append(hero(chungTotals,Object.keys(GROUPS).map(g=>({label:GLABEL[g],color:GROUPS[g].color,get:()=>chungTotals().grp[g]}))));
   v.append(summaryCard(Object.keys(GROUPS).map(g=>({label:GLABEL[g]+(g==='Khác'?' (tính giá 9999)':''),color:GROUPS[g].color,
     chi:()=>chungTotals().grp[g].chi,price:()=>S.prices[GROUPS[g].price],val:()=>chungTotals().grp[g].val})),'Tổng kết vàng'));
 
-  const gs=[...new Set(COLS.map(c=>c.g))];
+  if(isMob()){invMobile(v);}else{
+  const gs=GROUP_KEYS;
   const head1=h('tr',{},h('th',{class:'l',rowspan:2},'Nơi cất'));
   gs.forEach(g=>head1.append(h('th',{class:'g',style:'--c:'+GROUPS[g].color,colspan:COLS.filter(c=>c.g===g).length},GLABEL[g])));
   head1.append(h('th',{rowspan:2},'Tổng chỉ'),h('th',{rowspan:2}));
@@ -397,6 +466,7 @@ function renderChung(v){
     h('div',{class:'scroll'},h('table',{class:'inv'},h('thead',{},head1,head2),tb,tf)),
     h('div',{class:'foot'},h('span',{class:'hint'},'App tự quy đổi ra chỉ và tính giá trị.'),
       h('button',{class:'primary',onclick:()=>{S.chung.rows.push({name:'Nơi cất mới',c:COLS.map(()=>0)});save();render();}},'＋ Thêm nơi cất'))));
+  }
 
   const nb=h('tbody');
   S.chung.notes.forEach((n,ni)=>{
@@ -540,6 +610,7 @@ if(S.live)setStatus('',statusText());
 refreshLive();
 setInterval(()=>{refreshLive();syncNow();},60000);                       // tự cập nhật mỗi phút khi đang mở app
 document.addEventListener('visibilitychange',()=>{if(!document.hidden){refreshLive();syncNow();}});
+let wasMob=isMob();window.addEventListener('resize',()=>{if(isMob()!==wasMob){wasMob=isMob();render();}});
 window.addEventListener('online',()=>{refreshLive();syncNow();});
 setCloud();syncNow();
 
