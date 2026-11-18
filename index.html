@@ -11,6 +11,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Vàng">
+<script>try{if(JSON.parse(localStorage.getItem('gold-lock-v1')).hash)document.documentElement.classList.add('locked')}catch(e){}</script>
 <style>
 :root{
   --bg:#f0f2f5; --surf:#ffffff; --surf2:#f6f7f9; --line:#dde1e7; --txt:#1c2127; --mut:#5f6874;
@@ -24,6 +25,20 @@
   --sjc:#f0b429; --pnj:#ee7b6b; --g9999:#3fc2b1; --khac:#3fc2b1; --g97:#a38ce6;
 }}
 *{box-sizing:border-box}
+[hidden]{display:none!important}
+html.locked body>*:not(#lock){visibility:hidden}
+#lock{display:none;position:fixed;inset:0;z-index:1000;background:var(--bg);visibility:visible;place-items:center;padding:20px}
+html.locked #lock{display:grid}
+#lock .box{width:100%;max-width:360px;text-align:center}
+#lock img{width:72px;height:72px;border-radius:18px;margin-bottom:10px}
+#lock h1{margin:0 0 4px;font-size:22px}
+#lock p{color:var(--mut);margin:0 0 16px;font-size:14.5px}
+#lock input{width:100%;font:inherit;font-size:18px;text-align:center;padding:13px;border-radius:12px;border:1px solid var(--line);background:var(--surf);color:var(--txt);margin-bottom:10px}
+#lock button{width:100%;margin-bottom:8px;min-height:46px}
+#lock .err{color:var(--bad);min-height:20px;font-size:14px;margin-bottom:6px}
+#lock a{color:var(--mut);font-size:13.5px;text-decoration:underline;cursor:pointer}
+.lkrow{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px}
+.lkrow button{flex:1;min-width:140px}
 html{-webkit-text-size-adjust:100%}
 body{margin:0;font-family:"Segoe UI",Roboto,system-ui,-apple-system,sans-serif;font-size:16px;line-height:1.4;background:var(--bg);color:var(--txt);min-height:100vh}
 .wrap{max-width:1120px;margin:0 auto;padding:0 16px}
@@ -96,8 +111,6 @@ summary .psum{display:flex;gap:6px 18px;flex-wrap:wrap;font-size:14.5px;font-var
   .psum .pi{display:flex;justify-content:space-between;align-items:center;padding:9px 2px;border-top:1px solid var(--line);font-size:16px}
   .psum .pi b{font-size:18px}
 }
-.ios{display:flex;gap:12px;align-items:flex-start;border-left:5px solid var(--primary)}
-.ios p{margin:2px 0 0;font-size:14.5px;color:var(--mut)}.ios b{color:var(--txt)}
 .plbar{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin:14px 0 12px}
 .seg{display:inline-flex;border:1px solid var(--line);border-radius:10px;overflow:hidden}
 .seg button{border:0;border-radius:0;background:var(--surf2);color:var(--mut);min-height:36px;padding:6px 14px}
@@ -184,6 +197,7 @@ details.loc[open]>summary{border-bottom:1px solid var(--line);background:var(--s
   <button id="btnInstall" hidden class="primary">Cài app</button>
   <details class="menu" id="menu"><summary aria-label="Menu">⋯</summary>
     <div class="dd">
+      <button id="btnLock">🔒 Mật khẩu / Face ID</button>
       <button id="btnSync">☁ Đồng bộ giữa các máy</button>
       <button id="btnExport">⬇ Xuất file sao lưu</button>
       <button id="btnImport">⬆ Nhập file</button>
@@ -194,11 +208,6 @@ details.loc[open]>summary{border-bottom:1px solid var(--line);background:var(--s
 </div></header>
 
 <div class="wrap">
-  <div class="card ios" id="iosHint" hidden>
-    <div style="flex:1"><b>Cài app trên iPhone</b>
-      <p>Bấm nút <b>Chia sẻ</b> (hình vuông có mũi tên lên) ở thanh dưới Safari → kéo xuống chọn <b>Thêm vào MH chính</b> → <b>Thêm</b>.</p></div>
-    <button class="del" id="iosClose" aria-label="Ẩn">✕</button>
-  </div>
   <nav class="tabs" id="tabs"></nav>
   <div id="heroBox"></div>
 
@@ -212,6 +221,28 @@ details.loc[open]>summary{border-bottom:1px solid var(--line);background:var(--s
   <div id="view"></div>
   <p class="hint">Dữ liệu tự lưu trên thiết bị này • 1 cây = 10 chỉ • Dùng menu ⋯ → “Xuất file” để sao lưu hoặc chuyển sang máy khác.</p>
 </div>
+
+<div id="lock"><div class="box">
+  <img src="icon-192.png" alt=""><h1>Theo dõi vàng</h1><p id="lockHint">Nhập mật khẩu để mở app</p>
+  <input id="lockPw" type="password" autocomplete="off" placeholder="Mật khẩu" enterkeyhint="go">
+  <div class="err" id="lockErr"></div>
+  <button class="primary" id="lockGo">Mở khoá</button>
+  <button id="lockBio" hidden>Dùng Face ID / vân tay</button>
+  <a id="lockForgot">Quên mật khẩu?</a>
+</div></div>
+
+<dialog id="lockDlg">
+  <h2>🔒 Khoá app</h2>
+  <p id="lkInfo"></p>
+  <div id="lkSet">
+    <input id="lkCur" type="password" autocomplete="off" placeholder="Mật khẩu hiện tại">
+    <input id="lkNew" type="password" autocomplete="off" placeholder="Mật khẩu mới (tối thiểu 4 ký tự)">
+    <input id="lkNew2" type="password" autocomplete="off" placeholder="Nhập lại mật khẩu mới">
+  </div>
+  <div class="stt" id="lkStt" hidden></div>
+  <div class="lkrow" id="lkBtns"></div>
+  <div class="btns"><button id="lkClose">Đóng</button></div>
+</dialog>
 
 <dialog id="syncDlg">
   <h2>☁ Đồng bộ giữa các máy</h2>
@@ -522,6 +553,107 @@ function renderPerson(v,name){
   v.append(renameBtns(name));
 }
 
+/* ---------- Khoá app (mật khẩu + Face ID / vân tay) ---------- */
+const LKEY='gold-lock-v1';
+let LK; try{LK=JSON.parse(localStorage.getItem(LKEY))||{}}catch(e){LK={}}
+const saveLK=()=>localStorage.setItem(LKEY,JSON.stringify(LK));
+const b64=u=>btoa(String.fromCharCode(...new Uint8Array(u)));
+const unb64=t=>Uint8Array.from(atob(t),c=>c.charCodeAt(0));
+const rnd=n=>crypto.getRandomValues(new Uint8Array(n));
+const cryptoOK=()=>!!(window.crypto&&crypto.subtle&&window.isSecureContext);
+async function hashPw(pw,salt){
+  const k=await crypto.subtle.importKey('raw',new TextEncoder().encode(pw),'PBKDF2',false,['deriveBits']);
+  return b64(await crypto.subtle.deriveBits({name:'PBKDF2',hash:'SHA-256',salt,iterations:150000},k,256));
+}
+async function checkPw(pw){return !!LK.hash&&(await hashPw(pw,unb64(LK.salt)))===LK.hash;}
+async function bioAvailable(){try{return !!(window.PublicKeyCredential&&await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable());}catch(e){return false;}}
+async function bioRegister(){
+  const c=await navigator.credentials.create({publicKey:{challenge:rnd(32),rp:{name:'Theo dõi vàng'},user:{id:rnd(16),name:'chu-app',displayName:'Chủ app'},
+    pubKeyCredParams:[{type:'public-key',alg:-7},{type:'public-key',alg:-257}],
+    authenticatorSelection:{authenticatorAttachment:'platform',userVerification:'required'},timeout:60000}});
+  LK.cred=b64(c.rawId);saveLK();
+}
+async function bioAsk(){
+  await navigator.credentials.get({publicKey:{challenge:rnd(32),allowCredentials:[{type:'public-key',id:unb64(LK.cred),transports:['internal']}],userVerification:'required',timeout:60000}});
+}
+const root=document.documentElement;
+let failN=0,failUntil=0,hiddenAt=0;
+function showLock(){
+  if(!LK.hash)return;
+  root.classList.add('locked');$('#lockPw').value='';$('#lockErr').textContent='';
+  $('#lockBio').hidden=!LK.cred;
+  if(LK.cred)tryBio();
+}
+function unlock(){root.classList.remove('locked');$('#lockPw').value='';$('#lockErr').textContent='';failN=0;}
+async function tryBio(){try{await bioAsk();unlock();}catch(e){/* người dùng huỷ hoặc không hỗ trợ: dùng mật khẩu */}}
+async function tryPw(){
+  const now=Date.now();
+  if(now<failUntil){$('#lockErr').textContent='Thử lại sau '+Math.ceil((failUntil-now)/1000)+' giây';return;}
+  const pw=$('#lockPw').value;if(!pw)return;
+  if(await checkPw(pw))unlock();
+  else{failN++;$('#lockPw').value='';
+    if(failN>=5){failUntil=Date.now()+30000;failN=0;$('#lockErr').textContent='Sai nhiều lần, chờ 30 giây';}
+    else $('#lockErr').textContent='Sai mật khẩu';}
+}
+$('#lockGo').onclick=tryPw;
+$('#lockPw').addEventListener('keydown',e=>{if(e.key==='Enter')tryPw();});
+$('#lockBio').onclick=tryBio;
+$('#lockForgot').onclick=()=>{
+  if(confirm('Quên mật khẩu?\n\nCách duy nhất là xoá toàn bộ dữ liệu và khoá trên máy này.\nNếu bạn đã bật đồng bộ GitHub, dữ liệu vẫn còn trên GitHub và có thể lấy lại bằng cách bật đồng bộ lại.\n\nXoá dữ liệu trên máy này?')){
+    [KEY,SK,LKEY].forEach(k=>localStorage.removeItem(k));location.reload();}
+};
+// tự khoá khi quay lại app sau 30 giây
+document.addEventListener('visibilitychange',()=>{
+  if(document.hidden)hiddenAt=Date.now();
+  else if(LK.hash&&hiddenAt&&Date.now()-hiddenAt>30000)showLock();
+});
+
+// --- cài đặt khoá ---
+const lkMsg=(t,kind)=>{const e=$('#lkStt');e.hidden=!t;e.textContent=t||'';e.className='stt '+(kind||'');};
+async function renderLockDlg(){
+  const has=!!LK.hash,bio=await bioAvailable();
+  $('#lkCur').value=$('#lkNew').value=$('#lkNew2').value='';lkMsg('');
+  $('#lkCur').hidden=!has;
+  $('#lkNew').placeholder=has?'Mật khẩu mới (để đổi mật khẩu)':'Mật khẩu (tối thiểu 4 ký tự)';
+  $('#lkNew2').placeholder=has?'Nhập lại mật khẩu mới':'Nhập lại mật khẩu';
+  $('#lkInfo').textContent=!cryptoOK()?'Trình duyệt này không hỗ trợ khoá app.':
+    has?('Khoá đang BẬT'+(LK.cred?' • Face ID / vân tay: bật':'')+'. App sẽ hỏi mật khẩu khi mở và khi quay lại sau 30 giây.'):'Chưa bật khoá. Đặt mật khẩu để bảo vệ số liệu vàng của bạn.';
+  const b=$('#lkBtns');b.innerHTML='';
+  if(!cryptoOK())return;
+  const add=(t,fn,cls)=>{const x=h('button',{class:cls||''},t);x.onclick=fn;b.append(x);};
+  if(!has){
+    add('Đặt mật khẩu',async()=>{
+      const a=$('#lkNew').value,c=$('#lkNew2').value;
+      if(a.length<4)return lkMsg('Mật khẩu tối thiểu 4 ký tự','err');
+      if(a!==c)return lkMsg('Hai lần nhập chưa giống nhau','err');
+      const salt=rnd(16);LK={salt:b64(salt),hash:await hashPw(a,salt)};saveLK();
+      lkMsg('Đã bật khoá','ok');renderLockDlg();
+    },'primary');
+  }else{
+    const needCur=async()=>{if(await checkPw($('#lkCur').value))return true;lkMsg('Mật khẩu hiện tại chưa đúng','err');return false;};
+    add('Đổi mật khẩu',async()=>{
+      if(!await needCur())return;
+      const a=$('#lkNew').value,c=$('#lkNew2').value;
+      if(a.length<4)return lkMsg('Mật khẩu mới tối thiểu 4 ký tự','err');
+      if(a!==c)return lkMsg('Hai lần nhập chưa giống nhau','err');
+      const salt=rnd(16);LK.salt=b64(salt);LK.hash=await hashPw(a,salt);saveLK();
+      $('#lkCur').value=$('#lkNew').value=$('#lkNew2').value='';lkMsg('Đã đổi mật khẩu','ok');
+    },'primary');
+    if(bio&&!LK.cred)add('Bật Face ID / vân tay',async()=>{
+      try{await bioRegister();lkMsg('Đã bật Face ID / vân tay','ok');renderLockDlg();}
+      catch(e){lkMsg('Không bật được Face ID / vân tay trên thiết bị này','err');}
+    });
+    if(LK.cred)add('Tắt Face ID / vân tay',()=>{delete LK.cred;saveLK();lkMsg('Đã tắt Face ID / vân tay','ok');renderLockDlg();});
+    add('Tắt khoá',async()=>{
+      if(!await needCur())return;
+      LK={};saveLK();root.classList.remove('locked');lkMsg('Đã tắt khoá','ok');renderLockDlg();
+    },'del');
+  }
+}
+$('#btnLock').onclick=async()=>{await renderLockDlg();$('#lockDlg').showModal();};
+$('#lkClose').onclick=()=>$('#lockDlg').close();
+if(LK.hash)showLock();else root.classList.remove('locked');
+
 /* ---------- Đồng bộ qua GitHub Gist ---------- */
 const SK='gold-sync-v1',FILE='gold-tracker-data.json',GAPI='https://api.github.com';
 let SY; try{SY=JSON.parse(localStorage.getItem(SK))||{}}catch(e){SY={}}
@@ -629,9 +761,6 @@ window.addEventListener('online',()=>{refreshLive();syncNow();});
 setCloud();syncNow();
 
 /* ---------- Cài app (PWA) ---------- */
-(()=>{const ios=/iphone|ipad|ipod/i.test(navigator.userAgent||'');const standalone=navigator.standalone||(window.matchMedia&&matchMedia('(display-mode: standalone)').matches);
-  if(ios&&!standalone&&!localStorage.getItem('gold-ios-hint')){$('#iosHint').hidden=false;}
-  $('#iosClose').onclick=()=>{$('#iosHint').hidden=true;localStorage.setItem('gold-ios-hint','1');};})();
 let deferred;
 window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();deferred=e;$('#btnInstall').hidden=false;});
 $('#btnInstall').onclick=async()=>{if(!deferred)return;deferred.prompt();await deferred.userChoice;deferred=null;$('#btnInstall').hidden=true;};
