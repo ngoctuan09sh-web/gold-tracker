@@ -88,7 +88,16 @@ details.card>summary::-webkit-details-marker{display:none}
 details.card>summary::before{content:"▸";color:var(--mut);transition:.15s}
 details.card[open]>summary::before{transform:rotate(90deg)}
 summary .ttl{font-weight:700;font-size:17px}
-summary .psum{color:var(--mut);font-size:14px;font-variant-numeric:tabular-nums}
+summary .psum{display:flex;gap:6px 18px;flex-wrap:wrap;font-size:14.5px;font-variant-numeric:tabular-nums;color:var(--txt)}
+.psum .pi{display:inline-flex;gap:6px;align-items:baseline}
+.psum .pi b{font-weight:700}
+@media(max-width:640px){
+  summary .psum{flex-direction:column;flex-wrap:nowrap;width:100%;gap:0;margin-top:6px}
+  .psum .pi{display:flex;justify-content:space-between;align-items:center;padding:9px 2px;border-top:1px solid var(--line);font-size:16px}
+  .psum .pi b{font-size:18px}
+}
+.ios{display:flex;gap:12px;align-items:flex-start;border-left:5px solid var(--primary)}
+.ios p{margin:2px 0 0;font-size:14.5px;color:var(--mut)}.ios b{color:var(--txt)}
 .plbar{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin:14px 0 12px}
 .seg{display:inline-flex;border:1px solid var(--line);border-radius:10px;overflow:hidden}
 .seg button{border:0;border-radius:0;background:var(--surf2);color:var(--mut);min-height:36px;padding:6px 14px}
@@ -185,11 +194,16 @@ details.loc[open]>summary{border-bottom:1px solid var(--line);background:var(--s
 </div></header>
 
 <div class="wrap">
+  <div class="card ios" id="iosHint" hidden>
+    <div style="flex:1"><b>Cài app trên iPhone</b>
+      <p>Bấm nút <b>Chia sẻ</b> (hình vuông có mũi tên lên) ở thanh dưới Safari → kéo xuống chọn <b>Thêm vào MH chính</b> → <b>Thêm</b>.</p></div>
+    <button class="del" id="iosClose" aria-label="Ẩn">✕</button>
+  </div>
   <nav class="tabs" id="tabs"></nav>
   <div id="heroBox"></div>
 
   <details class="card" id="pricesD" open>
-    <summary><span class="ttl">Giá vàng hôm nay</span><span class="psum" id="psum"></span></summary>
+    <summary><span class="ttl">Giá vàng hôm nay <small style="font-weight:400;color:var(--mut);font-size:13px">(triệu đồng/cây)</small></span><span class="psum" id="psum"></span></summary>
     <div class="plbar"><span class="seg" id="basis"><button data-m="buy">Giá mua vào</button><button data-m="sell">Giá bán ra</button></span>
       <span class="hint">Triệu đồng / cây. Bấm vào số để nhập tay.</span></div>
     <div class="prices" id="prices"></div>
@@ -350,7 +364,7 @@ async function refreshLive(){
     setStatus('err',(S.live?'Không kết nối được, đang dùng giá đã lưu • ':'Không lấy được giá • ')+(S.live?statusText():'nhập tay bên dưới'));
   }
 }
-function updPsum(){const e=$('#psum');if(e)e.textContent=Object.keys(TYPES).map(t=>TYPES[t].name.replace('Vàng ','')+' '+fmt(S.prices[t])).join('  •  ');}
+function updPsum(){const e=$('#psum');if(e)e.innerHTML=Object.keys(TYPES).map(t=>`<span class="pi"><span><i class="dot" style="background:${TYPES[t].color};margin-right:7px"></i>${TYPES[t].name}</span><b>${fmt(S.prices[t])}</b></span>`).join('');}
 function renderPrices(){
   const box=$('#prices');box.innerHTML='';
   Object.keys(TYPES).forEach(t=>{
@@ -615,6 +629,9 @@ window.addEventListener('online',()=>{refreshLive();syncNow();});
 setCloud();syncNow();
 
 /* ---------- Cài app (PWA) ---------- */
+(()=>{const ios=/iphone|ipad|ipod/i.test(navigator.userAgent||'');const standalone=navigator.standalone||(window.matchMedia&&matchMedia('(display-mode: standalone)').matches);
+  if(ios&&!standalone&&!localStorage.getItem('gold-ios-hint')){$('#iosHint').hidden=false;}
+  $('#iosClose').onclick=()=>{$('#iosHint').hidden=true;localStorage.setItem('gold-ios-hint','1');};})();
 let deferred;
 window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();deferred=e;$('#btnInstall').hidden=false;});
 $('#btnInstall').onclick=async()=>{if(!deferred)return;deferred.prompt();await deferred.userChoice;deferred=null;$('#btnInstall').hidden=true;};
